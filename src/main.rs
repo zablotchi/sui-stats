@@ -4,7 +4,7 @@ use sui_indexer_alt_framework::{
     cluster::{self, IndexerCluster},
     pipeline::concurrent::ConcurrentConfig,
 };
-use sui_sizes::{MIGRATIONS, Sizes};
+use sui_sizes::{EffectSizes, MIGRATIONS, ObjectSizes, Sizes, TransactionSizes};
 use url::Url;
 
 #[derive(clap::Parser, Debug)]
@@ -28,6 +28,18 @@ async fn main() -> Result<()> {
 
     indexer
         .concurrent_pipeline(Sizes, ConcurrentConfig::default())
+        .await?;
+
+    indexer
+        .concurrent_pipeline(TransactionSizes, ConcurrentConfig::default())
+        .await?;
+
+    indexer
+        .concurrent_pipeline(ObjectSizes, ConcurrentConfig::default())
+        .await?;
+
+    indexer
+        .concurrent_pipeline(EffectSizes, ConcurrentConfig::default())
         .await?;
 
     let _ = indexer.run().await?.await;

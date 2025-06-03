@@ -9,6 +9,24 @@ diesel::table! {
 }
 
 diesel::table! {
+    effect_sizes (tx_digest, cp_sequence_number) {
+        tx_digest -> Text,
+        cp_sequence_number -> Int8,
+        effect_size_bytes -> Int8,
+    }
+}
+
+diesel::table! {
+    object_sizes (object_id, version) {
+        object_id -> Text,
+        cp_sequence_number -> Int8,
+        object_size_bytes -> Int8,
+        is_input -> Bool,
+        version -> Int8,
+    }
+}
+
+diesel::table! {
     sizes (cp_sequence_number) {
         cp_sequence_number -> Int8,
         cp_summary_bytes -> Int8,
@@ -22,6 +40,14 @@ diesel::table! {
         obj_bytes -> Int8,
         unique_object_ids -> Int8,
         unique_event_ids -> Int8,
+    }
+}
+
+diesel::table! {
+    transaction_sizes (tx_digest, cp_sequence_number) {
+        tx_digest -> Text,
+        cp_sequence_number -> Int8,
+        tx_size_bytes -> Int8,
     }
 }
 
@@ -40,6 +66,9 @@ diesel::table! {
 
 diesel::allow_tables_to_appear_in_same_query!(
     cp_sequence_numbers,
+    effect_sizes,
+    object_sizes,
     sizes,
+    transaction_sizes,
     watermarks,
 );
