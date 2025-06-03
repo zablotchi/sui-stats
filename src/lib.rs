@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Instant;
 
 use anyhow::Context;
 use diesel::prelude::Insertable;
@@ -14,6 +16,10 @@ use sui_indexer_alt_framework::{
 mod schema;
 
 pub const MIGRATIONS: EmbeddedMigrations = embed_migrations!("migrations");
+
+// Global counters for tracking progress
+static PROCESSED_COUNT: AtomicU64 = AtomicU64::new(0);
+static START_TIME: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 
 #[derive(Insertable, FieldCount)]
 #[diesel(table_name = sizes)]
@@ -40,6 +46,25 @@ impl Processor for Sizes {
     /// The processing logic for turning a checkpoint into rows of the table.
     fn process(&self, checkpoint: &Arc<CheckpointData>) -> Result<Vec<Self::Value>> {
         let cp_sequence_number = checkpoint.checkpoint_summary.sequence_number as i64;
+
+        // Initialize start time on first checkpoint
+        let start_time = START_TIME.get_or_init(|| Instant::now());
+
+        // Increment processed count
+        let current_count = PROCESSED_COUNT.fetch_add(1, Ordering::Relaxed) + 1;
+
+        // Print progress every 1000 checkpoints
+        if current_count % 1000 == 0 {
+            let elapsed = start_time.elapsed();
+            let rate = current_count as f64 / elapsed.as_secs_f64();
+            println!(
+                "Progress: Processed {} checkpoints (current: {}) | Rate: {:.2} checkpoints/sec | Elapsed: {:.2}s",
+                current_count,
+                cp_sequence_number,
+                rate,
+                elapsed.as_secs_f64()
+            );
+        }
 
         let cp_summary_bytes = bcs::to_bytes(&checkpoint.checkpoint_summary.data())
             .context("Failed to serialize checkpoint summary")?
