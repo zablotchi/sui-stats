@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
@@ -34,6 +35,8 @@ pub struct StoredSize {
     ev_bytes: i64,
     obj_count: i64,
     obj_bytes: i64,
+    unique_object_ids: i64,
+    unique_event_ids: i64,
 }
 
 pub struct Sizes;
@@ -86,6 +89,10 @@ impl Processor for Sizes {
         let mut obj_count = 0;
         let mut obj_bytes = 0;
 
+        // Track unique object IDs and event IDs across all transactions
+        let mut unique_object_ids = HashSet::new();
+        let mut unique_event_ids = HashSet::new();
+
         for transaction in &checkpoint.transactions {
             tx_bytes += bcs::to_bytes(transaction)
                 .context("Failed to serialize transaction")?
@@ -101,10 +108,24 @@ impl Processor for Sizes {
 
             obj_count += transaction.output_objects.len() as i64;
 
+            // Collect unique object IDs from input objects
+            for object in &transaction.input_objects {
+                unique_object_ids.insert(object.id());
+            }
+
+            // Collect unique object IDs from output objects and calculate bytes
             for object in &transaction.output_objects {
+                unique_object_ids.insert(object.id());
                 obj_bytes += bcs::to_bytes(object)
                     .context("Failed to serialize object")?
                     .len() as i64;
+            }
+
+            // Collect unique event IDs from transaction events
+            if let Some(events) = &transaction.events {
+                for event in &events.data {
+                    unique_event_ids.insert(event.package_id);
+                }
             }
         }
 
@@ -122,6 +143,8 @@ impl Processor for Sizes {
 
             obj_count,
             obj_bytes,
+            unique_object_ids: unique_object_ids.len() as i64,
+            unique_event_ids: unique_event_ids.len() as i64,
         }])
     }
 }
